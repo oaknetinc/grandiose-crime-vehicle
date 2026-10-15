@@ -13,7 +13,6 @@ const NFT_TILES = 2026;
 // Preview portrait pool in img/web/pfp/pfp_01.webp … (preview art only, faces repeat)
 const PFP_POOL = 12;
 (() => {
-  document.documentElement.classList.add('js');
   const $ = (s, el = document) => el.querySelector(s);
   const $$ = (s, el = document) => [...el.querySelectorAll(s)];
   const reduce = matchMedia('(prefers-reduced-motion: reduce)').matches;
@@ -44,14 +43,12 @@ const PFP_POOL = 12;
   document.addEventListener('keydown', e => { if (e.key === 'Escape') setMenu(false); });
 
   const navMap = new Map($$('a[href^="#"]', links).map(a => [a.getAttribute('href').slice(1), a]));
-  const spy = new IntersectionObserver(es => es.forEach(en => {
+  const spy = !('IntersectionObserver' in window) ? { observe() {} } : new IntersectionObserver(es => es.forEach(en => {
     if (en.isIntersecting) { navMap.forEach(a => a.classList.remove('is-active')); navMap.get(en.target.id)?.classList.add('is-active'); }
   }), { rootMargin: '-45% 0px -50% 0px' });
   navMap.forEach((_, id) => { const s = document.getElementById(id); s && spy.observe(s); });
 
-  // Reveal on scroll
-  const rev = new IntersectionObserver(es => es.forEach(en => { if (en.isIntersecting) { en.target.classList.add('in'); rev.unobserve(en.target); } }), { threshold: .15 });
-  $$('.reveal').forEach(el => rev.observe(el));
+  // Reveal on scroll: see the unified reveal controller further down
 
   // Pro-rata demo
   const holders = $$('.holder');
@@ -125,7 +122,7 @@ const PFP_POOL = 12;
   const parallaxOK = matchMedia('(min-width: 900px) and (hover: hover) and (pointer: fine)').matches && !reduce;
   if (parallaxOK) {
     const layers = [...sbgs, $('.hero__bg')].filter(Boolean), vis = new Set();
-    const pIO = new IntersectionObserver(es => es.forEach(en => en.isIntersecting ? vis.add(en.target) : vis.delete(en.target)));
+    const pIO = !('IntersectionObserver' in window) ? { observe() {} } : new IntersectionObserver(es => es.forEach(en => en.isIntersecting ? vis.add(en.target) : vis.delete(en.target)));
     layers.forEach(l => pIO.observe(l.parentElement));
     let ticking = false;
     const frame = () => {
@@ -280,16 +277,34 @@ const PFP_POOL = 12;
     });
   });
   $$('.footer .reveal').forEach((el, i) => el.style.setProperty('--i', i));
-  const rev2 = new IntersectionObserver(es => es.forEach(en => {
-    if (!en.isIntersecting) return; const el = en.target; el.classList.add('in'); rev2.unobserve(el);
-    setTimeout(() => el.classList.add('done'), 1500);
-  }), { threshold: .12 });
-  $$('.reveal:not(.in)').forEach(el => rev2.observe(el));
-  const headIO = new IntersectionObserver(es => es.forEach(en => { if (en.isIntersecting) { en.target.classList.add('in'); headIO.unobserve(en.target); } }), { threshold: .3 });
-  $$('.section .h2, .crew .h2, .section .eyebrow, .crew .eyebrow').forEach(el => headIO.observe(el));
+  // Unified reveal controller with failsafes. Content must never stay hidden:
+  //  1) IntersectionObserver (generous margin, threshold 0) reveals as things approach the viewport
+  //  2) a scroll/resize catch-up pass reveals anything already above the viewport bottom (covers
+  //     missed or throttled IO callbacks, anchor jumps, fast flings)
+  //  3) no IO support, printing, or a 4 s timeout -> reveal everything (plus a CSS-only failsafe
+  //     animation in style.css in case this script dies after adding .js)
+  document.documentElement.classList.add('js'); // hides .reveal etc.; added only once the controller below is guaranteed to run
+  const revealTargets = $$('.reveal, .section .h2, .crew .h2, .section .eyebrow, .crew .eyebrow');
+  const showEl = (el) => { if (el.classList.contains('in')) return; el.classList.add('in'); setTimeout(() => el.classList.add('done'), 1500); };
+  const revealAll = () => { revealTargets.forEach(showEl); document.documentElement.classList.add('revealed-all'); };
+  let pending = revealTargets.slice();
+  const catchUp = () => {
+    const lim = innerHeight * 1.05;
+    pending = pending.filter(el => { if (el.classList.contains('in')) return false; if (el.getBoundingClientRect().top < lim) { showEl(el); return false; } return true; });
+  };
+  if ('IntersectionObserver' in window) {
+    const rio = new IntersectionObserver(es => es.forEach(en => { if (en.isIntersecting) { showEl(en.target); rio.unobserve(en.target); } }), { rootMargin: '0px 0px 10% 0px', threshold: 0 });
+    revealTargets.forEach(el => rio.observe(el));
+    let cuTick = false;
+    const onCU = () => { if (!cuTick && pending.length) { cuTick = true; requestAnimationFrame(() => { cuTick = false; catchUp(); }); } };
+    addEventListener('scroll', onCU, { passive: true }); addEventListener('resize', onCU); addEventListener('hashchange', () => setTimeout(catchUp, 50));
+    catchUp(); addEventListener('load', catchUp);
+    setTimeout(revealAll, 4000);
+  } else revealAll();
+  addEventListener('beforeprint', revealAll);
 
   // Animated number counters
-  const countIO = new IntersectionObserver(es => es.forEach(en => {
+  const countIO = !('IntersectionObserver' in window) ? { observe() {}, unobserve() {} } : new IntersectionObserver(es => es.forEach(en => {
     if (!en.isIntersecting) return; const el = en.target; countIO.unobserve(el);
     const end = +el.dataset.count, pad = +el.dataset.pad || 0, fmt = (v) => pad ? String(v).padStart(pad, '0') : v.toLocaleString('en-US');
     if (reduce) { el.textContent = fmt(end); return; }

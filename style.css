@@ -617,6 +617,15 @@ body .bx.reveal.in{transition-delay:calc(var(--i,0) * 90ms)}
   .sparks,.fx-burst{display:none}
 }
 
+/* Reveal failsafe (CSS-only): if JS never marks an element .in, show it anyway after 4.5 s */
+@keyframes revealFailsafe{to{opacity:1;transform:none}}
+.js .reveal:not(.in),.js .section .h2:not(.in),.js .crew .h2:not(.in),.js .section .eyebrow:not(.in),.js .crew .eyebrow:not(.in){animation:revealFailsafe .6s ease 4.5s forwards}
+@media print{.js .reveal,.js .h2,.js .eyebrow{opacity:1!important;transform:none!important}}
+@media (max-width:820px){
+  .hud{z-index:51}
+  .hud__wanted{top:calc((var(--navh) - 26px) / 2 - var(--navh));right:auto;left:50%;transform:translateX(-50%)}
+}
+
 /* Responsive */
 @media (max-width:1180px){
   .brand__name{display:none}
