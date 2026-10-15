@@ -1,7 +1,7 @@
 /* Grandiose Crime Vehicle — script.js (no deps) */
 
 /* ===== CONFIG: fill these in at launch. Everything else reads from here. ===== */
-const TOKEN_CA = '';        // pump.fun mint / contract address of $GCV (leave '' until launch)
+const TOKEN_CA = '3Hd6x9bekpW3EyqkyvTUKbPmMCmd8Nv7enkVVsFypump';        // pump.fun mint / contract address of $GCV (Token-2022, 6 decimals)
 const CREATOR_WALLET = '';  // creator (dev) wallet that earns pump.fun creator fees ('' = read it from the token's bonding curve)
 const WL_ENDPOINT = '/api/wl';      // whitelist backend (Vercel function). GET -> {open, claimed, cap}, POST <- signup JSON. '' = signups off
 const WL_CARD_ENDPOINT = '/api/card'; // GET ?wallet=… -> {card}. The server reads TOKEN_CA from its own env, never from this file.
