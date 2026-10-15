@@ -3,7 +3,8 @@
 /* ===== CONFIG: fill these in at launch. Everything else reads from here. ===== */
 const TOKEN_CA = '';        // pump.fun mint / contract address of $GCV (leave '' until launch)
 const CREATOR_WALLET = '';  // creator (dev) wallet that earns pump.fun creator fees ('' = read it from the token's bonding curve)
-const WL_ENDPOINT = '';     // whitelist backend URL. GET -> {"claimed": <int>}, POST <- signup JSON. '' = signups not open
+const WL_ENDPOINT = '/api/wl';      // whitelist backend (Vercel function). GET -> {open, claimed, cap}, POST <- signup JSON. '' = signups off
+const WL_CARD_ENDPOINT = '/api/card'; // GET ?wallet=… -> {card}. The server reads TOKEN_CA from its own env, never from this file.
 // Public Solana JSON-RPC nodes, tried in order. api.mainnet-beta.solana.com is rate-limited and often answers
 // browser requests with 403, so it's the fallback here. For launch, put a keyed, domain-locked RPC
 // (Helius, QuickNode, Triton…) first in this list.
@@ -615,28 +616,176 @@ const PFP_POOL = 12;
   }
 
   // ===== Whitelist =====
-  const WL_CAP = 2026, WL_FLAG = 'gcv-wl-submitted', WL_CODE = 'gcv-wl-code';
+  const WL_CAP = 2026, WL_FLAG = 'gcv-wl-submitted', WL_CODE = 'gcv-wl-code', WL_WALLET = 'gcv-wl-wallet';
   const store = { get: (k) => { try { return localStorage.getItem(k); } catch { return null; } }, set: (k, v) => { try { localStorage.setItem(k, v); } catch {} }, del: (k) => { try { localStorage.removeItem(k); } catch {} } };
   const wl = $('#wl-form');
   if (wl) {
-    // Counter: only ever shows a real number from WL_ENDPOINT, otherwise "— / 2026"
+    const NS = 'http://www.w3.org/2000/svg';
+    const esc = (v) => String(v == null ? '' : v).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+    const TIER = {
+      priority: { label: 'PRIORITY', stars: 5 }, holder: { label: 'HOLDER', stars: 3 },
+      inactive: { label: 'INACTIVE', stars: 0 }, pending: { label: 'PENDING', stars: 1 },
+    };
+    const fmtNum = (n) => n == null ? '—' : Number(n).toLocaleString('en-US', { maximumFractionDigits: n >= 100 ? 0 : 2 });
+    const short = (w) => w.slice(0, 4) + '…' + w.slice(-4);
+
+    // ---- Deterministic avatar (SVG built from the wallet hash seed; same wallet = same face) ----
+    function avatarSVG(seed) {
+      const b = (seed.match(/../g) || []).map(h => parseInt(h, 16)), pick = (a, i) => a[b[i % b.length] % a.length];
+      const bg = pick([['#2b0a5e', '#ff2e93', '#ffd166'], ['#150a2b', '#c23cff', '#ff8a1f'], ['#4a1590', '#ff8a1f', '#ffe36e'], ['#0c0618', '#18d6c8', '#ff2e93'], ['#2b0a5e', '#4c8dff', '#ff8cc3'], ['#3a0a4a', '#ff4d4d', '#ffd166']], 0);
+      const skin = pick(['#f2c9a0', '#e0a878', '#c68642', '#a0693a', '#7a4a2a', '#f5d6b8'], 1);
+      const shirt = pick(['#ff2e93', '#18d6c8', '#ffd166', '#c23cff', '#ff8a1f', '#f6eefe'], 2);
+      const hatC = pick(['#ffd166', '#ff2e93', '#f6eefe', '#18d6c8', '#c23cff', '#ff8a1f'], 5);
+      const hair = pick(['#1a0f10', '#3b2417', '#0c0618', '#7a3b1a', '#ffd166', '#c23cff'], 6);
+      const head = b[3] % 5, shades = b[4] & 1, stache = b[4] & 2, chain = b[7] & 1, id = 'a' + seed;
+      let o = `<svg xmlns="${NS}" viewBox="0 0 120 120" role="img" aria-label="Generated crew avatar"><defs><linearGradient id="${id}" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="${bg[0]}"/><stop offset="1" stop-color="${bg[1]}"/></linearGradient></defs>`;
+      o += `<rect width="120" height="120" fill="url(#${id})"/><circle cx="60" cy="70" r="30" fill="${bg[2]}" opacity=".85"/>`;
+      o += `<g stroke="${bg[0]}" stroke-width="2" opacity=".5"><path d="M0 78h120M0 86h120M0 94h120"/></g>`;
+      if (head === 4) o += `<circle cx="60" cy="40" r="28" fill="${hair}"/>`;
+      o += `<path d="M12 120C14 92 36 84 60 84s46 8 48 36z" fill="${shirt}"/><path d="M46 84l14 14 14-14" fill="none" stroke="rgba(0,0,0,.25)" stroke-width="3"/>`;
+      o += `<rect x="51" y="72" width="18" height="16" rx="6" fill="${skin}"/><rect x="51" y="72" width="18" height="6" fill="rgba(0,0,0,.18)"/>`;
+      o += `<ellipse cx="38" cy="58" rx="4" ry="6" fill="${skin}"/><ellipse cx="82" cy="58" rx="4" ry="6" fill="${skin}"/><ellipse cx="60" cy="56" rx="22" ry="26" fill="${skin}"/>`;
+      if (shades) o += `<rect x="38" y="50" width="20" height="10" rx="4" fill="#0c0618"/><rect x="62" y="50" width="20" height="10" rx="4" fill="#0c0618"/><rect x="57" y="53" width="6" height="2.5" fill="#0c0618"/><path d="M41 52l7 0" stroke="rgba(255,255,255,.55)" stroke-width="1.6"/><path d="M65 52l7 0" stroke="rgba(255,255,255,.55)" stroke-width="1.6"/>`;
+      else o += `<circle cx="49" cy="54" r="4" fill="#fff"/><circle cx="71" cy="54" r="4" fill="#fff"/><circle cx="50" cy="55" r="2" fill="#150a2b"/><circle cx="72" cy="55" r="2" fill="#150a2b"/>`;
+      o += `<path d="M58 60q2 6 4 6" fill="none" stroke="rgba(0,0,0,.3)" stroke-width="1.6" stroke-linecap="round"/>`;
+      o += stache ? `<path d="M47 71q13-8 26 0q-13 5-26 0z" fill="#1a0f10"/>` : `<path d="M51 71q9 7 18 0" fill="none" stroke="#7a2a2a" stroke-width="2.4" stroke-linecap="round"/>`;
+      if (head === 0) o += `<ellipse cx="60" cy="36" rx="54" ry="11" fill="${hatC}"/><path d="M38 36Q38 6 60 6t22 30z" fill="${hatC}"/><rect x="38" y="28" width="44" height="6" fill="${bg[1]}"/><ellipse cx="60" cy="38" rx="54" ry="11" fill="none" stroke="rgba(0,0,0,.25)" stroke-width="2"/>`;
+      if (head === 1) o += `<path d="M38 46Q60 22 82 46L82 38Q60 14 38 38z" fill="${hatC}"/><circle cx="82" cy="44" r="5" fill="${hatC}"/><path d="M84 46l8 8M84 48l4 10" stroke="${hatC}" stroke-width="3" stroke-linecap="round"/><circle cx="52" cy="32" r="1.6" fill="rgba(0,0,0,.3)"/><circle cx="64" cy="29" r="1.6" fill="rgba(0,0,0,.3)"/>`;
+      if (head === 2) o += `<path d="M37 52Q33 22 60 22t23 30Q76 36 60 36T37 52z" fill="${hair}"/>`;
+      if (head === 3) o += `<path d="M54 34L55 6h10l1 28z" fill="${hatC}"/><path d="M40 44Q42 32 54 32M80 44Q78 32 66 32" fill="none" stroke="${hair}" stroke-width="4"/>`;
+      if (head === 4) o += `<path d="M38 48Q40 34 60 34t22 14Q72 40 60 40T38 48z" fill="${hair}"/>`;
+      if (chain) o += `<path d="M44 90Q60 108 76 90" fill="none" stroke="#ffd166" stroke-width="3"/><circle cx="60" cy="102" r="4" fill="#ffd166"/>`;
+      return o + '</svg>';
+    }
+
+    // ---- Card (DOM) ----
+    const slot = $('#wl-card-slot'), emptyMsg = $('#wl-card-empty');
+    let shown = null, shownKey = '';
+    const stars = (n) => Array.from({ length: 5 }, (_, i) => `<span class="${i < n ? 'on' : 'off'}">★</span>`).join('');
+    function cardHTML(c) {
+      const t = TIER[c.tier] || TIER.pending, arrow = c.trend === 'up' ? '▲' : c.trend === 'down' ? '▼' : '▬';
+      const trendTxt = c.trend === 'up' ? `up ${fmtNum(c.trendDelta)}` : c.trend === 'down' ? `down ${fmtNum(Math.abs(c.trendDelta))}` : 'no change';
+      const joined = c.joinedAt ? new Date(c.joinedAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) : '—';
+      return `<div class="gcard__top"><span class="gcard__brand">GCV · CREW ID</span><span class="gcard__tier">${t.label}</span></div>
+        <div class="gcard__avatar">${avatarSVG(c.avatarSeed)}</div>
+        <h4 class="gcard__alias">${esc(c.alias)}</h4>
+        <div class="gcard__stars" role="img" aria-label="Wanted level ${t.stars} of 5">${stars(t.stars)}</div>
+        <dl class="gcard__stats">
+          <div><dt>Spot</dt><dd>#${esc(String(c.spot || 0).padStart(4, '0'))} / ${WL_CAP}</dd></div>
+          <div><dt>Rank</dt><dd>${esc(c.rank || '—')}</dd></div>
+          <div class="wide"><dt>$GCV balance</dt><dd>${esc(fmtNum(c.balance))}${c.balance != null ? `<span class="gcard__trend ${esc(c.trend || 'flat')}" title="Change since the last balance change we saw"><span aria-hidden="true">${arrow}</span> ${esc(trendTxt)}</span>` : ''}</dd></div>
+          <div><dt>Share of supply</dt><dd>${c.share == null ? '—' : esc(c.share) + '%'}</dd></div>
+          <div><dt>PSN ID</dt><dd>${c.psn ? esc(c.psn) : 'none'}</dd></div>
+          <div class="wide"><dt>Joined</dt><dd>${esc(joined)}</dd></div>
+        </dl>
+        <p class="gcard__msg">${esc(c.message || '')}</p>
+        <div class="gcard__foot"><span class="gcard__wallet" title="Wallet">${esc(short(c.wallet))}</span>
+          <span class="gcard__btns"><button class="btn btn--small btn--ghost" type="button" data-act="dl">Download card</button><button class="btn btn--small btn--ghost" type="button" data-act="forget">Hide</button></span></div>
+        <p class="gcard__upd" data-upd>Live balance. Updates itself every minute.</p>`;
+    }
+    function showCard(c, animate) {
+      const key = JSON.stringify({ ...c, updatedAt: 0 });
+      shown = c;
+      if (key === shownKey && slot.querySelector('.gcard')) { return; }
+      const first = !slot.querySelector('.gcard') || slot.querySelector('.gcard').dataset.w !== c.wallet;
+      shownKey = key; emptyMsg.hidden = true;
+      let el = slot.querySelector('.gcard');
+      if (!el) { el = document.createElement('article'); slot.append(el); }
+      el.className = `gcard gcard--${c.tier}` + ((animate || first) && !reduce ? ' is-in' : '');
+      el.dataset.w = c.wallet;
+      el.setAttribute('aria-label', `Crew card for ${c.alias}, tier ${(TIER[c.tier] || TIER.pending).label}`);
+      el.innerHTML = cardHTML(c);
+      el.tabIndex = -1;
+    }
+    function clearCard() { const el = slot.querySelector('.gcard'); if (el) el.remove(); shown = null; shownKey = ''; emptyMsg.hidden = false; }
+
+    // ---- Download card as PNG (SVG -> canvas) ----
+    function cardSVG(c) {
+      const t = TIER[c.tier] || TIER.pending, W = 600, H = 860, col = { priority: ['#ffd166', '#ff2e93'], holder: ['#18d6c8', '#4c8dff'], inactive: ['#6c5a8c', '#3b2d57'], pending: ['#ff8a1f', '#c23cff'] }[c.tier] || ['#ff8a1f', '#c23cff'];
+      const av = avatarSVG(c.avatarSeed).replace('<svg ', '<svg x="140" y="120" width="320" height="320" ');
+      const st = Array.from({ length: 5 }, (_, i) => `<text x="${220 + i * 40}" y="522" font-size="34" fill="${i < t.stars ? '#ffd166' : '#ffffff33'}" text-anchor="middle">★</text>`).join('');
+      const rows = [['SPOT', `#${String(c.spot || 0).padStart(4, '0')} / ${WL_CAP}`], ['RANK', c.rank || '—'], ['$GCV BALANCE', fmtNum(c.balance) + (c.trend === 'up' ? '  ▲' : c.trend === 'down' ? '  ▼' : '')], ['PSN ID', c.psn || 'none']];
+      const r = rows.map(([k, v], i) => `<text x="70" y="${590 + i * 44}" font-size="16" letter-spacing="3" fill="#b9a8d6" font-family="Arial,sans-serif" font-weight="700">${esc(k)}</text><text x="530" y="${590 + i * 44}" font-size="24" fill="#f6eefe" text-anchor="end" font-family="Arial,sans-serif" font-weight="700">${esc(v)}</text>`).join('');
+      return `<svg xmlns="${NS}" width="${W}" height="${H}" viewBox="0 0 ${W} ${H}"><defs><linearGradient id="bd" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="${col[0]}"/><stop offset="1" stop-color="${col[1]}"/></linearGradient><linearGradient id="bg" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#2a0e55"/><stop offset="1" stop-color="#0c0618"/></linearGradient><clipPath id="cp"><circle cx="300" cy="280" r="160"/></clipPath></defs>
+        <rect width="${W}" height="${H}" rx="36" fill="url(#bd)"/><rect x="8" y="8" width="${W - 16}" height="${H - 16}" rx="30" fill="url(#bg)"/>
+        <text x="50" y="68" font-size="26" fill="${col[0]}" font-family="Impact,'Arial Black',sans-serif" letter-spacing="2">GCV · CREW ID</text>
+        <rect x="400" y="38" width="150" height="40" rx="20" fill="url(#bd)"/><text x="475" y="65" font-size="18" fill="#0c0618" text-anchor="middle" font-family="Arial,sans-serif" font-weight="800" letter-spacing="3">${t.label}</text>
+        <g clip-path="url(#cp)">${av}</g><circle cx="300" cy="280" r="160" fill="none" stroke="${col[0]}" stroke-width="8"/>
+        <text x="300" y="486" font-size="${c.alias.length > 26 ? 27 : 32}" fill="#f6eefe" text-anchor="middle" font-family="Impact,'Arial Black',sans-serif">${esc(c.alias.toUpperCase())}</text>${st}${r}
+        <text x="70" y="810" font-size="15" fill="#b9a8d6" font-family="monospace">${esc(short(c.wallet))}</text><text x="530" y="810" font-size="15" fill="#b9a8d6" text-anchor="end" font-family="Arial,sans-serif">grandoisecrimevehicle.fun</text></svg>`;
+    }
+    function downloadCard(c) {
+      const url = URL.createObjectURL(new Blob([cardSVG(c)], { type: 'image/svg+xml;charset=utf-8' })), img = new Image();
+      img.onload = () => {
+        const cv = document.createElement('canvas'); cv.width = 1200; cv.height = 1720;
+        cv.getContext('2d').drawImage(img, 0, 0, 1200, 1720); URL.revokeObjectURL(url);
+        cv.toBlob(bl => {
+          if (!bl) return say('Couldn\'t build the PNG on this browser.');
+          const a = document.createElement('a'); a.href = URL.createObjectURL(bl); a.download = `gcv-crew-card-${String(c.spot || 0).padStart(4, '0')}.png`;
+          document.body.append(a); a.click(); a.remove(); setTimeout(() => URL.revokeObjectURL(a.href), 4000); say('Card saved ✔');
+        }, 'image/png');
+      };
+      img.onerror = () => { URL.revokeObjectURL(url); say('Couldn\'t build the PNG on this browser.'); };
+      img.src = url;
+    }
+    slot.addEventListener('click', e => {
+      const b = e.target.closest('button[data-act]'); if (!b || !shown) return;
+      if (b.dataset.act === 'dl') downloadCard(shown);
+      if (b.dataset.act === 'forget') { store.del(WL_WALLET); stopRefresh(); clearCard(); say('Card hidden. Look it up anytime with your wallet.'); }
+    });
+
+    // ---- API ----
+    async function fetchCard(wallet) {
+      const r = await fetch(`${WL_CARD_ENDPOINT}?wallet=${encodeURIComponent(wallet)}`, { headers: { Accept: 'application/json' } });
+      const j = await r.json().catch(() => ({}));
+      if (!r.ok) { const e = new Error(j.message || j.error || `HTTP ${r.status}`); e.status = r.status; throw e; }
+      return j.card;
+    }
+    let refreshTimer = null, lastAt = 0;
+    const stopRefresh = () => { clearInterval(refreshTimer); refreshTimer = null; };
+    async function refresh() {
+      const w = store.get(WL_WALLET); if (!w || document.hidden) return;
+      try {
+        const c = await fetchCard(w); lastAt = Date.now(); showCard(c, false);
+        const u = slot.querySelector('[data-upd]'); if (u) u.textContent = 'Live balance. Updated ' + new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) + '.';
+      } catch (e) { if (e.status === 404) { store.del(WL_WALLET); store.del(WL_FLAG); stopRefresh(); clearCard(); unlock(); } else console.warn('[GCV card]', e); }
+    }
+    function startRefresh() { stopRefresh(); refreshTimer = setInterval(refresh, 60000); }
+    document.addEventListener('visibilitychange', () => { if (!document.hidden && store.get(WL_WALLET) && Date.now() - lastAt > 60000) refresh(); });
+
+    // Lookup form
+    const lk = $('#wl-lookup'), lkIn = $('#wl-lookup-wallet'), lkErr = $('#wl-lookup-err'), lkGo = $('#wl-lookup-go');
+    lk.addEventListener('submit', async e => {
+      e.preventDefault();
+      const v = lkIn.value.trim();
+      if (!isAddress(v)) { lkIn.setAttribute('aria-invalid', 'true'); lkErr.textContent = 'That isn\'t a valid Solana address (32–44 base58 characters).'; lkIn.focus(); return; }
+      lkIn.removeAttribute('aria-invalid'); lkErr.textContent = ''; lkGo.disabled = true; lkGo.textContent = 'Looking…';
+      try { const c = await fetchCard(v); showCard(c, true); lastAt = Date.now(); store.set(WL_WALLET, v); startRefresh(); slot.querySelector('.gcard')?.focus({ preventScroll: true }); }
+      catch (err) { lkErr.textContent = err.status === 404 ? 'No whitelist card for that wallet yet. Sign up above.' : `Couldn't load that card (${err.message}).`; }
+      finally { lkGo.disabled = false; lkGo.textContent = 'Find card'; }
+    });
+
+    // ---- Counter: only a real number from the API, otherwise "— / 2026" ----
     const claimedEl = $('#wl-claimed'), bar = $('#wl-bar'), countNote = $('#wl-count-note');
-    if (WL_ENDPOINT) {
+    const loadCount = () => {
+      if (!WL_ENDPOINT) { countNote.textContent = 'The counter goes live when signups open.'; return; }
       fetch(WL_ENDPOINT, { headers: { Accept: 'application/json' } })
         .then(r => r.ok ? r.json() : Promise.reject(new Error(`HTTP ${r.status}`)))
         .then(j => {
+          if (j.open === false) { countNote.textContent = 'Signups open soon.'; return; }
           const n = Number(j.claimed ?? j.count);
           if (!Number.isInteger(n) || n < 0) throw new Error('bad count');
           const c = Math.min(n, WL_CAP);
           claimedEl.textContent = c.toLocaleString('en-US');
           $('span', bar).style.setProperty('--w', (c / WL_CAP * 100).toFixed(2) + '%');
           bar.setAttribute('aria-valuenow', c); bar.setAttribute('aria-valuetext', `${c} of ${WL_CAP} claimed`);
-          countNote.textContent = c >= WL_CAP ? 'All spots are claimed.' : 'Live count from the whitelist backend.';
+          countNote.textContent = c >= WL_CAP ? 'All spots are claimed.' : j.tokenLive === false ? 'Live count. Signups need a wallet holding $GCV, so spots open at token launch.' : 'Live count from the whitelist backend.';
         })
         .catch(e => { console.warn('[GCV whitelist count]', e); countNote.textContent = 'Couldn\'t load the live count right now.'; });
-    }
+    };
+    loadCount();
 
-    // Optional ownership code
+    // ---- Optional ownership code ----
     const gen = $('#wl-gen'), codeEl = $('#wl-code'), codeCopy = $('#wl-code-copy'), xField = $('#wl-x-field');
     const showCode = (c) => { codeEl.textContent = c; codeEl.hidden = codeCopy.hidden = xField.hidden = false; gen.textContent = 'New code'; };
     const saved = store.get(WL_CODE); if (saved) showCode(saved);
@@ -646,11 +795,11 @@ const PFP_POOL = 12;
       store.set(WL_CODE, c); showCode(c); say(`Your code: ${c}`);
     });
 
-    // Validation
+    // ---- Validation (PSN is optional) ----
     const f = { wallet: $('#wl-wallet'), psn: $('#wl-psn'), email: $('#wl-email'), x: $('#wl-x'), hype: $('#wl-hype') };
     const rules = {
       wallet: v => !v ? 'Enter your Solana wallet address.' : !isAddress(v) ? 'That isn\'t a valid Solana address (32–44 base58 characters, no 0, O, I or l).' : '',
-      psn: v => !v ? 'Enter your PSN ID.' : !/^[A-Za-z][A-Za-z0-9_-]{2,15}$/.test(v) ? 'PSN IDs are 3–16 characters: letters, numbers, - or _, and start with a letter.' : '',
+      psn: v => v && !/^[A-Za-z][A-Za-z0-9_-]{2,15}$/.test(v) ? 'PSN IDs are 3–16 characters: letters, numbers, - or _, and start with a letter. Or leave it empty.' : '',
       email: v => v && !/^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(v) ? 'That email doesn\'t look right. Fix it or leave it empty.' : '',
       x: v => v && !/^@?[A-Za-z0-9_]{1,15}$/.test(v) ? 'X handles are up to 15 letters, numbers or _.' : '',
       hype: (_, el) => el.checked ? '' : 'Tick the box to confirm. It\'s the honor system.',
@@ -665,17 +814,21 @@ const PFP_POOL = 12;
     const errBox = $('#wl-errors'), result = $('#wl-result'), submit = $('#wl-submit');
     const setResult = (cls, msg) => { result.className = `wl-form__result ${cls}`; result.textContent = msg; };
     const lock = (on) => { [...wl.elements].forEach(el => { if (el.id !== 'wl-gen' && el.id !== 'wl-code-copy') el.disabled = on; }); };
+    function unlock() { lock(false); submit.textContent = 'Claim my spot'; setResult('', ''); }
     const done = () => {
-      const s = store.get(WL_FLAG); if (!s) return;
+      if (!store.get(WL_FLAG)) return;
       lock(true); submit.textContent = 'You\'re on the list';
-      setResult('is-ok', 'You\'re on the list from this browser. ');
+      setResult('is-ok', 'You\'re on the list from this browser. Your crew card is below. ');
       const again = document.createElement('button'); again.type = 'button'; again.textContent = 'Sign up a different wallet';
-      again.addEventListener('click', () => { store.del(WL_FLAG); lock(false); submit.textContent = 'Claim my spot'; setResult('', ''); f.wallet.focus(); });
+      again.addEventListener('click', () => { store.del(WL_FLAG); unlock(); f.wallet.focus(); });
       result.append(again);
     };
     done();
 
-    let sending = false;
+    // Returning visitor: show their card straight away, then keep it live.
+    if (WL_ENDPOINT && store.get(WL_WALLET)) { refresh().then(() => { if (shown) startRefresh(); }); }
+
+    const t0 = Date.now(); let sending = false;
     wl.addEventListener('submit', async e => {
       e.preventDefault();
       if (sending || store.get(WL_FLAG)) return;
@@ -690,23 +843,31 @@ const PFP_POOL = 12;
       errBox.hidden = true;
       if (!WL_ENDPOINT) { setResult('is-info', 'Signups open soon. Your details look good, but nothing was sent or saved. Check back when signups go live.'); return; }
 
-      sending = true; submit.disabled = true; wl.setAttribute('aria-busy', 'true'); submit.textContent = 'Sending…'; setResult('', '');
+      sending = true; submit.disabled = true; wl.setAttribute('aria-busy', 'true'); submit.textContent = 'Checking your wallet…'; setResult('', '');
       const code = store.get(WL_CODE);
       const body = {
-        wallet: f.wallet.value.trim(), psn_id: f.psn.value.trim(), email: f.email.value.trim() || null,
-        ps5_or_hyped: f.hype.checked, verify_code: code || null, x_handle: code ? (f.x.value.trim().replace(/^@/, '') || null) : null,
-        source: 'gcv-site', submitted_at: new Date().toISOString(),
+        wallet: f.wallet.value.trim(), psn: f.psn.value.trim() || null, email: f.email.value.trim() || null,
+        hype: f.hype.checked, code: code || null, x: code ? (f.x.value.trim().replace(/^@/, '') || null) : null,
+        website: $('#wl-website').value, t: Date.now() - t0,
       };
       try {
         const r = await fetch(WL_ENDPOINT, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
-        if (!r.ok) { const j = await r.json().catch(() => ({})); throw new Error(j.error || j.message || `HTTP ${r.status}`); }
-        store.set(WL_FLAG, JSON.stringify({ wallet: body.wallet, at: body.submitted_at })); // the backend must still dedupe by wallet
-        done(); say('You\'re on the list ✔');
+        const j = await r.json().catch(() => ({}));
+        if (j.open === false) { setResult('is-info', j.message || 'Signups open soon. Nothing was saved.'); return; }
+        if (!r.ok || !j.card) {
+          const msg = j.error || j.message || `HTTP ${r.status}`;
+          setResult(j.code === 'token_not_live' || j.code === 'no_balance' ? 'is-info' : 'is-err', j.code ? msg : `Couldn't send that (${msg}). Please try again in a moment.`);
+          if (j.full) countNote.textContent = 'All spots are claimed.';
+          return;
+        }
+        store.set(WL_FLAG, JSON.stringify({ wallet: body.wallet, at: new Date().toISOString() })); store.set(WL_WALLET, body.wallet);
+        done(); showCard(j.card, true); lastAt = Date.now(); startRefresh(); loadCount();
+        say(j.existing ? 'That wallet was already on the list. Here\'s its card.' : 'You\'re on the list ✔');
+        $('#wl-card-zone').scrollIntoView({ behavior: reduce ? 'auto' : 'smooth', block: 'start' });
       } catch (err) {
         console.warn('[GCV whitelist]', err);
         setResult('is-err', `Couldn't send that (${err.message}). Please try again in a moment.`);
-        submit.disabled = false; submit.textContent = 'Claim my spot';
-      } finally { sending = false; wl.removeAttribute('aria-busy'); }
+      } finally { sending = false; wl.removeAttribute('aria-busy'); if (!store.get(WL_FLAG)) { submit.disabled = false; submit.textContent = 'Claim my spot'; } }
     });
   }
 

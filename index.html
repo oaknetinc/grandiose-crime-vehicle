@@ -440,14 +440,15 @@
           <p class="wl-count__num"><span id="wl-claimed">—</span> <span class="wl-count__cap">/ <span data-count="2026">2026</span></span></p>
           <p class="wl-count__label" id="wl-count-label">spots claimed</p>
           <div class="wl-count__bar" role="progressbar" aria-label="Whitelist spots claimed" aria-valuemin="0" aria-valuemax="2026" aria-valuetext="Not live yet" id="wl-bar"><span></span></div>
-          <p class="tiny" id="wl-count-note">The counter goes live when signups open.</p>
+          <p class="tiny" id="wl-count-note">Loading the live count…</p>
         </div>
 
         <div class="wl__facts bx t-dossier hv-lift">
           <span class="bx__ico" aria-hidden="true"><svg><use href="#i-folder"/></svg></span>
           <ul class="promise__list">
-          <li><strong>Your wallet is the real check.</strong> It must hold $GCV. Holdings are checked at the snapshot, not on this page.</li>
-          <li><strong>Your PSN ID is a community-trust extra.</strong> There's no public Sony API, so we can't verify PS5 play history. We can't verify a GTA VI preorder either.</li>
+          <li><strong>Your wallet is the real check.</strong> You need to hold $GCV to sign up. The site reads the public balance on Solana when you sign up, and keeps reading it for your card.</li>
+          <li><strong>Priority = hold $GCV + add a PSN ID.</strong> <strong>Holder = hold $GCV only</strong>, next in line. Sell it all and your card shows Inactive (your spot is flagged, not erased).</li>
+          <li><strong>PSN is an optional extra.</strong> There's no public Sony API, so we can't verify PS5 play history or a GTA VI preorder. A wallet balance is the only hard check.</li>
           <li><strong>The whitelist is extra, not the deal.</strong> Every holder still shares in the fees, on the list or not.</li>
         </ul>
         </div>
@@ -459,17 +460,19 @@
         <h3 id="wl-form-title" class="wl-form__title">Get on the list</h3>
         <div class="wl-form__errors" id="wl-errors" role="alert" tabindex="-1" hidden></div>
 
+        <div class="wl-hp" aria-hidden="true"><label for="wl-website">Website</label><input id="wl-website" name="website" type="text" tabindex="-1" autocomplete="off"></div>
+
         <div class="field">
           <label for="wl-wallet">Solana wallet address <span class="req" aria-hidden="true">*</span></label>
           <input id="wl-wallet" name="wallet" type="text" required autocomplete="off" spellcheck="false" aria-describedby="wl-wallet-hint wl-wallet-err">
-          <p class="hint" id="wl-wallet-hint">The wallet that holds your $GCV (32–44 base58 characters).</p>
+          <p class="hint" id="wl-wallet-hint">The wallet that holds your $GCV (32–44 base58 characters). Signups need a balance above 0. Pasting an address isn't proof you own it, so never share a seed phrase.</p>
           <p class="field__err" id="wl-wallet-err"></p>
         </div>
 
         <div class="field">
-          <label for="wl-psn">PSN ID <span class="req" aria-hidden="true">*</span></label>
-          <input id="wl-psn" name="psn" type="text" required autocomplete="nickname" spellcheck="false" maxlength="16" aria-describedby="wl-psn-hint wl-psn-err">
-          <p class="hint" id="wl-psn-hint">3–16 characters: letters, numbers, - or _, starting with a letter.</p>
+          <label for="wl-psn">PSN ID <span class="opt">(optional, upgrades you to Priority)</span></label>
+          <input id="wl-psn" name="psn" type="text" autocomplete="nickname" spellcheck="false" maxlength="16" aria-describedby="wl-psn-hint wl-psn-err">
+          <p class="hint" id="wl-psn-hint">3–16 characters: letters, numbers, - or _, starting with a letter. Not verified. Card lookups are public, so your PSN ID shows on your card.</p>
           <p class="field__err" id="wl-psn-err"></p>
         </div>
 
@@ -504,8 +507,32 @@
 
         <button class="btn wl-form__submit" type="submit" id="wl-submit">Claim my spot</button>
         <p class="wl-form__result" id="wl-result" role="status" aria-live="polite"></p>
-        <p class="tiny">Privacy: until signups open, nothing you type here is sent or saved. After that, your details go only to the whitelist backend and are used only for this whitelist. Email is optional.</p>
+        <p class="tiny">Privacy: your details go only to the whitelist backend and are used only for this whitelist. Email is optional and never shown on your card. Wallet addresses, PSN IDs and balances on a card are public to anyone who has the wallet address.</p>
       </form>
+    </div>
+
+    <div class="wrap wl-card-zone" id="wl-card-zone">
+      <div class="wl-card-head">
+        <p class="eyebrow">Your crew card</p>
+        <h3 class="display wl-card-title">Holder ID</h3>
+        <p class="lede">Sign up and your wallet gets a generated crew ID with an avatar and a name. It follows your $GCV balance and updates on its own: tier, balance, and whether you're up or down.</p>
+      </div>
+      <div class="wl-card-grid">
+        <div class="wl-card-slot" id="wl-card-slot" aria-live="polite">
+          <p class="wl-card-empty" id="wl-card-empty">No card yet. Sign up above, or look up a wallet that already has one.</p>
+        </div>
+        <form class="wl-lookup bx t-wallet" id="wl-lookup" novalidate aria-labelledby="wl-lookup-title">
+          <span class="bx__ico" aria-hidden="true"><svg><use href="#i-wallet"/></svg></span>
+          <h4 class="wl-lookup__title" id="wl-lookup-title">Look up my card</h4>
+          <div class="field">
+            <label for="wl-lookup-wallet">Wallet address</label>
+            <input id="wl-lookup-wallet" type="text" autocomplete="off" spellcheck="false" aria-describedby="wl-lookup-err">
+            <p class="field__err" id="wl-lookup-err"></p>
+          </div>
+          <button class="btn btn--small" type="submit" id="wl-lookup-go">Find card</button>
+          <p class="tiny">Cards are public by wallet address. Only the alias, tier, balance, rank, PSN ID (if you gave one) and spot show. Email never does. Tier reads the public wallet balance, and PSN IDs are not verified.</p>
+        </form>
+      </div>
     </div>
   </section>
 </main>
