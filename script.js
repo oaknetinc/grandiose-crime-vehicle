@@ -8,6 +8,10 @@ const WL_ENDPOINT = '';     // whitelist backend URL. GET -> {"claimed": <int>},
 // browser requests with 403, so it's the fallback here. For launch, put a keyed, domain-locked RPC
 // (Helius, QuickNode, Triton…) first in this list.
 const SOLANA_RPC = ['https://solana-rpc.publicnode.com', 'https://api.mainnet-beta.solana.com'];
+// NFT collection preview: number of face-down tiles (change to 4000 if the collection size changes)
+const NFT_TILES = 2026;
+// Preview portrait pool in img/web/pfp/pfp_01.webp … (preview art only, faces repeat)
+const PFP_POOL = 12;
 (() => {
   document.documentElement.classList.add('js');
   const $ = (s, el = document) => el.querySelector(s);
@@ -78,14 +82,15 @@ const SOLANA_RPC = ['https://solana-rpc.publicnode.com', 'https://api.mainnet-be
   });
 
   // Lightbox
-  const cards = $$('.card'), lb = $('#lightbox'), img = $('#lb-img');
+  const cards = $$('[data-lb]'), lb = $('#lightbox'), img = $('#lb-img');
   let idx = 0, opener = null;
   const show = (i) => {
     idx = (i + cards.length) % cards.length; const c = cards[idx], d = c.dataset;
-    img.src = `img/web/${d.img}-1280.webp`; img.alt = $('img', c).alt;
+    const srcOf = (el) => el.dataset.src || `img/web/${el.dataset.img}-1280.webp`;
+    img.src = srcOf(c); img.alt = ($('img', c) || $('#crew img'))?.alt || d.name;
     $('#lb-name').textContent = d.name; $('#lb-role').innerHTML = d.role; $('#lb-blurb').textContent = d.blurb;
     // preload neighbour
-    new Image().src = `img/web/${cards[(idx + 1) % cards.length].dataset.img}-1280.webp`;
+    new Image().src = srcOf(cards[(idx + 1) % cards.length]);
   };
   cards.forEach((c, i) => c.addEventListener('click', () => {
     opener = c; show(i);
@@ -101,6 +106,138 @@ const SOLANA_RPC = ['https://solana-rpc.publicnode.com', 'https://api.mainnet-be
   let sx = null;
   lb.addEventListener('touchstart', e => sx = e.touches[0].clientX, { passive: true });
   lb.addEventListener('touchend', e => { if (sx == null) return; const dx = e.changedTouches[0].clientX - sx; if (Math.abs(dx) > 50) show(idx + (dx < 0 ? 1 : -1)); sx = null; });
+
+
+  // ===== Art backgrounds: lazy-load + parallax =====
+  const bgW = () => (innerWidth * (devicePixelRatio || 1) > 1200 ? 1920 : 960);
+  const sbgs = $$('.sbg[data-bg]');
+  const loadBg = (el) => {
+    if (el.dataset.loaded) return; el.dataset.loaded = '1';
+    const url = `img/web/bg-${el.dataset.bg}-${bgW()}.webp`, im = new Image();
+    im.onload = () => { el.style.backgroundImage = `url(${url})`; el.classList.add('is-loaded'); };
+    im.src = url;
+  };
+  if ('IntersectionObserver' in window) {
+    const bgIO = new IntersectionObserver(es => es.forEach(en => { if (en.isIntersecting) { loadBg(en.target); bgIO.unobserve(en.target); } }), { rootMargin: '600px 0px' });
+    sbgs.forEach(el => bgIO.observe(el));
+  } else sbgs.forEach(loadBg);
+
+  const parallaxOK = matchMedia('(min-width: 900px) and (hover: hover) and (pointer: fine)').matches && !reduce;
+  if (parallaxOK) {
+    const layers = [...sbgs, $('.hero__bg')].filter(Boolean), vis = new Set();
+    const pIO = new IntersectionObserver(es => es.forEach(en => en.isIntersecting ? vis.add(en.target) : vis.delete(en.target)));
+    layers.forEach(l => pIO.observe(l.parentElement));
+    let ticking = false;
+    const frame = () => {
+      ticking = false; const vh = innerHeight;
+      layers.forEach(l => {
+        const sec = l.parentElement; if (!vis.has(sec)) return;
+        const r = sec.getBoundingClientRect(), prog = (r.top + r.height / 2 - vh / 2) / (vh + r.height); // -0.5 .. 0.5
+        const y = (prog * r.height * 0.22).toFixed(1), flip = l.classList.contains('sbg--flip') ? ' scaleX(-1)' : '';
+        l.style.transform = `translate3d(0,${y}px,0)${flip}`;
+      });
+    };
+    addEventListener('scroll', () => { if (!ticking) { ticking = true; requestAnimationFrame(frame); } }, { passive: true });
+    addEventListener('resize', frame); frame();
+  }
+
+  // ===== Box click effects (ripple + per-box flourish) =====
+  if (!reduce) document.addEventListener('pointerdown', e => {
+    const box = e.target.closest('.bx'); if (!box || e.target.closest('input,textarea,select,label,a,button:not(.bx)')) return;
+    const r = box.getBoundingClientRect(), size = Math.max(r.width, r.height) * 2.2, rp = document.createElement('span');
+    rp.className = 'ripple'; rp.style.cssText = `width:${size}px;height:${size}px;left:${e.clientX - r.left - size / 2}px;top:${e.clientY - r.top - size / 2}px`;
+    box.append(rp); rp.addEventListener('animationend', () => rp.remove());
+    if (box.tagName !== 'FORM' && box.tagName !== 'FIELDSET') {
+      box.classList.remove('is-clicked'); void box.offsetWidth; box.classList.add('is-clicked');
+      clearTimeout(box._ck); box._ck = setTimeout(() => box.classList.remove('is-clicked'), 1600);
+    }
+  });
+
+  // ===== NFT collection preview =====
+  const grid = $('#nft-grid');
+  if (grid) {
+    const CHUNK = 240, KEY = 'gcv-nft-revealed';
+    const hash = (n) => { let h = (n * 2654435761) >>> 0; h ^= h >>> 16; h = Math.imul(h, 0x45d9f3b) >>> 0; h ^= h >>> 16; return h >>> 0; };
+    const rarity = (n) => { const v = hash(n + 7) % 100; return v < 4 ? 'legendary' : v < 22 ? 'rare' : 'common'; }; // illustrative labels only
+    const pfpOf = (n) => `img/web/pfp/pfp_${String(hash(n) % PFP_POOL + 1).padStart(2, '0')}.webp`;
+    const label = { common: 'Common', rare: 'Rare', legendary: 'Legendary' };
+    let revealed = new Set();
+    try { revealed = new Set((JSON.parse(localStorage.getItem(KEY)) || []).filter(n => Number.isInteger(n) && n >= 1 && n <= NFT_TILES)); } catch {}
+    const save = () => { try { localStorage.setItem(KEY, JSON.stringify([...revealed])); } catch {} };
+    const countEl = $('#nft-revealed'), shownEl = $('#nft-shown'), moreBtn = $('#nft-more');
+    $('#nft-total').textContent = NFT_TILES.toLocaleString('en-US');
+    let rendered = 0;
+    const updCount = () => { countEl.textContent = revealed.size.toLocaleString('en-US'); };
+    const fillBack = (t, n) => {
+      const b = $('.nft__b', t); if (b.firstChild) return;
+      const im = document.createElement('img'); im.src = pfpOf(n); im.alt = ''; im.width = 256; im.height = 256; im.decoding = 'async';
+      const i = document.createElement('i'); i.textContent = label[t.dataset.r];
+      b.append(im, i);
+    };
+    const renderMore = () => {
+      if (rendered >= NFT_TILES) return;
+      const end = Math.min(rendered + CHUNK, NFT_TILES), frag = document.createDocumentFragment();
+      for (let n = rendered + 1; n <= end; n++) {
+        const t = document.createElement('button'), r = rarity(n), up = revealed.has(n);
+        t.type = 'button'; t.className = 'nft' + (up ? ' is-up' : ''); t.dataset.n = n; t.dataset.r = r; t.setAttribute('role', 'listitem');
+        t.setAttribute('aria-label', up ? `GCV #${n}, ${label[r]} preview, revealed. Open preview` : `GCV #${n}, face down. Flip to reveal`);
+        t.innerHTML = `<span class="nft__in"><span class="nft__f" style="--h:${hash(n * 31) % 360}"><span>GCV #${n}</span></span><span class="nft__b"></span></span>`;
+        if (up) fillBack(t, n);
+        frag.append(t);
+      }
+      grid.append(frag); rendered = end;
+      shownEl.textContent = `Showing ${rendered.toLocaleString('en-US')} of ${NFT_TILES.toLocaleString('en-US')} tiles`;
+      moreBtn.hidden = rendered >= NFT_TILES;
+    };
+    renderMore(); updCount();
+    moreBtn.addEventListener('click', renderMore);
+    if ('IntersectionObserver' in window) new IntersectionObserver(es => { if (es[0].isIntersecting) renderMore(); }, { root: $('#nft-scroll'), rootMargin: '400px 0px' }).observe($('#nft-sentinel'));
+
+    // modal
+    const nm = $('#nft-modal'), nmImg = $('#nm-img'), nmBadge = $('#nm-badge'), nmTitle = $('#nm-title');
+    let cur = 1, nmOpener = null;
+    const tileOf = (n) => grid.querySelector(`.nft[data-n="${n}"]`);
+    const flip = (t) => {
+      const n = +t.dataset.n; if (revealed.has(n)) return false;
+      fillBack(t, n); t.classList.add('is-up'); revealed.add(n); save(); updCount();
+      t.setAttribute('aria-label', `GCV #${n}, ${label[t.dataset.r]} preview, revealed. Open preview`); return true;
+    };
+    const openModal = (n) => {
+      cur = n; const r = rarity(n);
+      nmImg.src = pfpOf(n); nmImg.alt = `Preview portrait for GCV #${n}: a character in the GCV art style. Preview art only.`;
+      nmTitle.textContent = `GCV #${n}`; nmBadge.textContent = `${label[r]} (illustrative)`; nmBadge.dataset.r = r;
+      $('.nft-modal__card').style.setProperty('--rc', r === 'legendary' ? '#ffd166' : r === 'rare' ? '#4cc9ff' : '#c9b8e6');
+      if (!nm.open) { nm.showModal ? nm.showModal() : nm.setAttribute('open', ''); }
+    };
+    grid.addEventListener('click', e => {
+      const t = e.target.closest('.nft'); if (!t) return;
+      nmOpener = t; const n = +t.dataset.n;
+      if (flip(t)) setTimeout(() => openModal(n), reduce ? 0 : 650); else openModal(n);
+    });
+    const step = (d) => {
+      let n = cur + d; if (n < 1) n = NFT_TILES; if (n > NFT_TILES) n = 1;
+      while (n > rendered) renderMore();
+      const t = tileOf(n); if (t) { flip(t); nmOpener = t; } openModal(n);
+    };
+    $('#nm-prev').addEventListener('click', () => step(-1));
+    $('#nm-next').addEventListener('click', () => step(1));
+    $('#nm-close').addEventListener('click', () => nm.close());
+    nm.addEventListener('click', e => { if (e.target === nm) nm.close(); });
+    nm.addEventListener('keydown', e => { if (e.key === 'ArrowLeft') step(-1); if (e.key === 'ArrowRight') step(1); });
+    nm.addEventListener('close', () => { if (nmOpener && document.contains(nmOpener)) nmOpener.focus({ preventScroll: true }); });
+
+    $('#nft-random').addEventListener('click', () => {
+      const hidden = $$('.nft:not(.is-up)', grid); if (!hidden.length) { if (rendered < NFT_TILES) renderMore(); return say('All visible tiles are revealed. Load more!'); }
+      const t = hidden[Math.floor(Math.random() * hidden.length)];
+      t.scrollIntoView({ block: 'center', behavior: reduce ? 'auto' : 'smooth' });
+      nmOpener = t; flip(t); setTimeout(() => openModal(+t.dataset.n), reduce ? 0 : 800);
+    });
+    $('#nft-reset').addEventListener('click', () => {
+      revealed.clear(); save(); updCount();
+      $$('.nft.is-up', grid).forEach(t => { t.classList.remove('is-up'); t.setAttribute('aria-label', `GCV #${t.dataset.n}, face down. Flip to reveal`); });
+      say('All tiles flipped back');
+    });
+  }
 
   // ===== Solana helpers (base58, PDA derivation, JSON-RPC) =====
   const B58 = '123456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz';
