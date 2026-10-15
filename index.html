@@ -80,6 +80,13 @@
   </div>
 </header>
 
+<div class="hud" aria-hidden="true">
+  <div class="hud__road"><span class="hud__fill"></span><span class="hud__car"><svg viewBox="0 0 64 26" width="54" height="22"><ellipse cx="34" cy="6.2" rx="8" ry="1.8" fill="#ffd166"/><path d="M30 6 Q31 1.5 34 1.3 Q37 1.5 38 6Z" fill="#ffd166"/><path d="M2 18 Q2 14 8 14 L18 13 L24 7 Q26 6 30 6 L40 6 Q44 6 47 10 L50 13 L58 14 Q62 15 62 18 L62 20 L2 20Z" fill="#18d6c8"/><path d="M26 8 L39 8 Q42 8 44 11 L46 13 L23 13Z" fill="#0c0618" opacity=".75"/><rect x="2" y="17" width="60" height="1.4" fill="#ff2e93"/><circle cx="14" cy="21" r="4.6" fill="#111"/><circle cx="14" cy="21" r="2" fill="#ffd166"/><circle cx="50" cy="21" r="4.6" fill="#111"/><circle cx="50" cy="21" r="2" fill="#ffd166"/></svg></span></div>
+  <div class="hud__wanted"><span class="hud__label">Wanted</span><span class="stars"><i class="star"><b></b></i><i class="star"><b></b></i><i class="star"><b></b></i><i class="star"><b></b></i><i class="star"><b></b></i></span></div>
+</div>
+<p class="sr-only" id="pop-hint">Press Enter or Space for a surprise animation.</p>
+<p class="sr-only" id="pop-live" aria-live="polite"></p>
+
 <main id="main">
 
   <!-- HERO -->
@@ -128,30 +135,30 @@
     <div class="wrap">
       <p class="eyebrow">Mission briefing</p>
       <h2 id="plan-title" class="display h2">The Plan</h2>
-      <p class="lede">Twelve-plus years of waiting builds character. It also builds expectations. Here's our heist, in three easy steps.</p>
+      <p class="lede"><span data-count="12">12</span>-plus years of waiting builds character. It also builds expectations. Here's our heist, in three easy steps.</p>
       <ol class="steps">
-        <li class="step bx t-teal hv-lift reveal">
+        <li class="step bx t-teal hv-lift reveal" data-pop="hold" tabindex="0" aria-describedby="pop-hint">
           <span class="bx__ico" aria-hidden="true"><svg><use href="#i-wheel"/></svg></span>
-          <span class="step__num" aria-hidden="true">01</span>
+          <span class="step__num" aria-hidden="true" data-count="1" data-pad="2">01</span>
           <h3>Hold</h3>
           <p>Grab some $GCV, park it, and keep both hands on the wheel. The longer you ride, the more you count.</p>
         </li>
-        <li class="step bx t-gold hv-tilt reveal">
+        <li class="step bx t-gold hv-tilt reveal" data-pop="judge" tabindex="0" aria-describedby="pop-hint">
           <span class="bx__ico" aria-hidden="true"><svg><use href="#i-pad"/></svg></span>
-          <span class="step__num" aria-hidden="true">02</span>
+          <span class="step__num" aria-hidden="true" data-count="2" data-pad="2">02</span>
           <h3>GTA VI drops &amp; we judge it</h3>
           <p>Release day arrives. The community plays it, rates it, and decides: did it meet expectations, or not?</p>
         </li>
-        <li class="step step--split bx t-magenta hv-shine reveal">
+        <li class="step step--split bx t-magenta hv-shine reveal" data-pop="endings" tabindex="0" aria-describedby="pop-hint">
           <span class="bx__ico" aria-hidden="true"><svg><use href="#i-fork"/></svg></span>
-          <span class="step__num" aria-hidden="true">03</span>
+          <span class="step__num" aria-hidden="true" data-count="3" data-pad="2">03</span>
           <h3>Then one of two endings</h3>
           <div class="endings">
-            <div class="ending ending--good">
+            <div class="ending ending--good" data-pop="slaps" data-pop-anchor=".step" tabindex="0" aria-describedby="pop-hint">
               <strong>👍 It slaps</strong>
               <p>Dev fees get claimed and shared with the longest-term holders, pro rata.</p>
             </div>
-            <div class="ending ending--bad">
+            <div class="ending ending--bad" data-pop="flops" data-pop-anchor=".step" tabindex="0" aria-describedby="pop-hint">
               <strong>👎 It flops</strong>
               <p>We roll up our sleeves and build a better GTA VI around this project.</p>
             </div>
@@ -168,7 +175,7 @@
       <div class="fees__copy">
         <p class="eyebrow">The holder promise</p>
         <h2 id="fees-title" class="display h2">Fees &amp; Holders</h2>
-        <div class="promise bx t-sunset hv-glow reveal">
+        <div class="promise bx t-sunset hv-glow reveal" data-pop="lock" tabindex="0" aria-describedby="pop-hint">
           <span class="bx__ico" aria-hidden="true"><svg><use href="#i-lock"/></svg></span>
           <p class="promise__big">Dev fees will <span class="hl">NOT</span> be claimed until GTA VI launches.</p>
           <ul class="promise__list">
@@ -179,7 +186,7 @@
         </div>
       </div>
 
-      <div class="prorata bx t-blueprint hv-lift reveal" aria-labelledby="prorata-title">
+      <div class="prorata bx t-blueprint hv-lift reveal" aria-labelledby="prorata-title" data-pop="math">
         <span class="bx__ico" aria-hidden="true"><svg><use href="#i-scale"/></svg></span>
         <h3 id="prorata-title" class="prorata__title">How pro rata works</h3>
         <p class="prorata__formula" aria-label="Your weight equals amount held times time held">
@@ -245,31 +252,31 @@
         <p class="tracker__badge-note">The claim status is the team's stated commitment. The vault balances below are how you check it: unclaimed fees stay in the vault until someone claims them.</p>
 
         <dl class="stats" aria-label="Creator fee figures">
-          <div class="stat stat--hero bx t-bullion hv-glow ck-flip">
+          <div class="stat stat--hero bx t-bullion hv-glow ck-flip" data-pop="vault" tabindex="0" aria-describedby="pop-hint">
             <span class="bx__ico" aria-hidden="true"><svg><use href="#i-coins"/></svg></span>
             <dt>Unclaimed creator fees</dt>
             <dd><span data-ft="unclaimed">—</span> <small>SOL</small></dd>
             <dd class="stat__note">Sitting in pump.fun's creator-fee vaults right now (bonding curve + PumpSwap), not yet claimed.</dd>
           </div>
-          <div class="stat bx t-aqua hv-lift">
+          <div class="stat bx t-aqua hv-lift" data-pop="curve" tabindex="0" aria-describedby="pop-hint">
             <span class="bx__ico" aria-hidden="true"><svg><use href="#i-chart"/></svg></span>
             <dt>Bonding-curve vault</dt>
             <dd><span data-ft="curve">—</span> <small>SOL</small></dd>
             <dd class="stat__note">Fees from trades before the coin graduates.</dd>
           </div>
-          <div class="stat bx t-violet hv-tilt">
+          <div class="stat bx t-violet hv-tilt" data-pop="swap" tabindex="0" aria-describedby="pop-hint">
             <span class="bx__ico" aria-hidden="true"><svg><use href="#i-swap"/></svg></span>
             <dt>PumpSwap vault</dt>
             <dd><span data-ft="amm">—</span> <small>SOL</small></dd>
             <dd class="stat__note">Fees from trades after graduation (held as wrapped SOL).</dd>
           </div>
-          <div class="stat bx t-blue hv-shine">
+          <div class="stat bx t-blue hv-shine" data-pop="wallet" tabindex="0" aria-describedby="pop-hint">
             <span class="bx__ico" aria-hidden="true"><svg><use href="#i-wallet"/></svg></span>
             <dt>Creator wallet balance</dt>
             <dd><span data-ft="wallet">—</span> <small>SOL</small></dd>
             <dd class="stat__note">Everything in the wallet, from any source. This is <em>not</em> a fee figure.</dd>
           </div>
-          <div class="stat stat--muted bx t-ember hv-dash">
+          <div class="stat stat--muted bx t-ember hv-dash" data-pop="claims" tabindex="0" aria-describedby="pop-hint">
             <span class="bx__ico" aria-hidden="true"><svg><use href="#i-receipt"/></svg></span>
             <dt>Total fees claimed (all time)</dt>
             <dd><span data-ft="claimed">—</span></dd>
@@ -366,25 +373,25 @@
       <p class="eyebrow">Where we're driving</p>
       <h2 id="roadmap-title" class="display h2">Roadmap</h2>
       <ol class="road">
-        <li class="phase phase--live bx t-lime hv-lift reveal">
+        <li class="phase phase--live bx t-lime hv-lift reveal" data-pop="live" tabindex="0" aria-describedby="pop-hint">
           <span class="bx__ico" aria-hidden="true"><svg><use href="#i-globe"/></svg></span>
           <span class="phase__tag">Phase 1 · Live</span>
           <h3>Website &amp; Cast</h3>
           <p>This site, the poster, and the eight-character lineup in full sombrero glory.</p>
         </li>
-        <li class="phase phase--next bx t-pink hv-tilt reveal">
+        <li class="phase phase--next bx t-pink hv-tilt reveal" data-pop="crew" tabindex="0" aria-describedby="pop-hint">
           <span class="bx__ico" aria-hidden="true"><svg><use href="#i-people"/></svg></span>
           <span class="phase__tag">Phase 2 · Up next</span>
           <h3>Community</h3>
           <p>Socials, memes, fan art, and a crew big enough to judge a AAA game on release day.</p>
         </li>
-        <li class="phase phase--planned bx t-indigo hv-shine reveal">
+        <li class="phase phase--planned bx t-indigo hv-shine reveal" data-pop="film" tabindex="0" aria-describedby="pop-hint">
           <span class="bx__ico" aria-hidden="true"><svg><use href="#i-film"/></svg></span>
           <span class="phase__tag">Phase 3 · Planned</span>
           <h3>Concept Art &amp; Trailer</h3>
           <p>Fan-made concept art and a trailer for the "better GTA VI", made with the community.</p>
         </li>
-        <li class="phase phase--locked bx t-hazard hv-stripe ck-shake reveal">
+        <li class="phase phase--locked bx t-hazard hv-stripe ck-shake reveal" data-pop="fumble" tabindex="0" aria-describedby="pop-hint">
           <span class="bx__ico" aria-hidden="true"><svg><use href="#i-pad"/></svg></span>
           <span class="phase__tag">The Game · Not started</span>
           <h3>The Actual Game</h3>
@@ -426,11 +433,11 @@
       <div class="wl__copy">
         <p class="eyebrow">2026 spots. You know why.</p>
         <h2 id="wl-title" class="display h2">Whitelist</h2>
-        <p class="lede">An NFT whitelist for the crew, capped at 2026 spots as a nod to the year Leonida opens its doors.</p>
+        <p class="lede">An NFT whitelist for the crew, capped at <span data-count="2026">2026</span> spots as a nod to the year Leonida opens its doors.</p>
 
-        <div class="wl-count bx t-ticket hv-tilt ck-stamp reveal" aria-labelledby="wl-count-label">
+        <div class="wl-count bx t-ticket hv-tilt ck-stamp reveal" aria-labelledby="wl-count-label" data-pop="ticket" tabindex="0" aria-describedby="pop-hint">
           <span class="bx__ico" aria-hidden="true"><svg><use href="#i-ticket"/></svg></span>
-          <p class="wl-count__num"><span id="wl-claimed">—</span> <span class="wl-count__cap">/ 2026</span></p>
+          <p class="wl-count__num"><span id="wl-claimed">—</span> <span class="wl-count__cap">/ <span data-count="2026">2026</span></span></p>
           <p class="wl-count__label" id="wl-count-label">spots claimed</p>
           <div class="wl-count__bar" role="progressbar" aria-label="Whitelist spots claimed" aria-valuemin="0" aria-valuemax="2026" aria-valuetext="Not live yet" id="wl-bar"><span></span></div>
           <p class="tiny" id="wl-count-note">The counter goes live when signups open.</p>

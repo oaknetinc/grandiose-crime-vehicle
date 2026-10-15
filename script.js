@@ -141,6 +141,187 @@ const PFP_POOL = 12;
     addEventListener('resize', frame); frame();
   }
 
+
+  // ===== Click-triggered character pop-ups =====
+  const PAL = {
+    skin: ['#c98a5e', '#8d5a3b', '#e0b08a', '#6b4128', '#f1c9a5', '#a86b45'],
+    shirt: ['#2b0a5e', '#c2185b', '#0f766e', '#1d4ed8', '#7c2d12', '#111827', '#9333ea'],
+    hat: ['#d9a441', '#1a1a1a', '#b5651d', '#e8c872', '#6b21a8', '#c0392b'],
+    band: ['#ff2e93', '#18d6c8', '#ffd166', '#ff8a1f', '#4cc9ff'],
+  };
+  const pick = (arr, i) => arr[i % arr.length];
+  const npc = (i, prop = 'none', o = {}) => {
+    const skin = o.skin || pick(PAL.skin, i * 5 + 1), shirt = o.shirt || pick(PAL.shirt, i * 3 + 2), hat = o.hat || pick(PAL.hat, i * 7), band = pick(PAL.band, i * 2 + 1);
+    const mask = o.mask ?? (i % 3 === 1), arm = (d) => `<path d="${d}" stroke="${shirt}" stroke-width="8" stroke-linecap="round" fill="none"/>`;
+    const hand = (x, y) => `<circle cx="${x}" cy="${y}" r="4.5" fill="${skin}"/>`;
+    let p = '';
+    if (prop === 'wheel') p = `${arm('M34 88 L40 104')}${arm('M66 88 L60 104')}<g class="p-wheel" style="transform-origin:50px 106px"><circle cx="50" cy="106" r="15" fill="none" stroke="#222" stroke-width="5"/><path d="M50 106V92M50 106l-12 7M50 106l12 7" stroke="#555" stroke-width="3"/><circle cx="50" cy="106" r="4" fill="#ffd166"/></g>${hand(40, 104)}${hand(60, 104)}`;
+    else if (prop === 'card') p = `${arm('M34 88 L30 112')}${hand(30, 112)}<g class="p-raise" style="transform-origin:66px 88px">${arm('M66 88 L80 58')}<rect x="66" y="22" width="34" height="32" rx="4" fill="#fff" stroke="#222" stroke-width="2"/><text x="83" y="45" text-anchor="middle" font-family="Bungee, Impact, sans-serif" font-size="${(o.card || '').length > 2 ? 9 : 16}" fill="#1a0c36">${o.card || '10'}</text>${hand(80, 58)}</g>`;
+    else if (prop === 'cash') p = `<g class="p-cheer">${arm('M34 88 L20 60')}${arm('M66 88 L80 60')}<rect x="6" y="46" width="26" height="13" rx="2" fill="#4caf6e" stroke="#1d6b3a" transform="rotate(-18 19 52)"/><rect x="68" y="46" width="26" height="13" rx="2" fill="#4caf6e" stroke="#1d6b3a" transform="rotate(18 81 52)"/>${hand(20, 60)}${hand(80, 60)}</g>`;
+    else if (prop === 'hammer') p = `${arm('M34 88 L30 112')}${hand(30, 112)}<g class="p-swing" style="transform-origin:66px 88px">${arm('M66 88 L82 62')}<path d="M82 62 L90 32" stroke="#8a5a2b" stroke-width="4.5" stroke-linecap="round"/><rect x="79" y="22" width="22" height="11" rx="2" fill="#a7b4c6" stroke="#4b5563" transform="rotate(16 90 27)"/>${hand(82, 62)}</g>`;
+    else if (prop === 'coin') p = `${arm('M34 88 L44 102')}${arm('M66 88 L56 102')}<circle cx="50" cy="102" r="10" fill="#ffd166" stroke="#a16207" stroke-width="2"/><text x="50" y="106.5" text-anchor="middle" font-size="12" font-weight="700" fill="#7c4a03">$</text>${hand(43, 102)}${hand(57, 102)}`;
+    else if (prop === 'wave') p = `${arm('M34 88 L30 112')}${hand(30, 112)}<g class="p-raise" style="transform-origin:66px 88px">${arm('M66 88 L82 60')}${hand(82, 60)}</g>`;
+    else p = `${arm('M34 88 L30 112')}${arm('M66 88 L70 112')}${hand(30, 112)}${hand(70, 112)}`;
+    const eyes = mask ? `<rect x="32" y="49" width="36" height="9" rx="4.5" fill="#111"/><circle cx="43" cy="53.5" r="2" fill="#fff"/><circle cx="57" cy="53.5" r="2" fill="#fff"/>`
+      : `<circle cx="44" cy="54" r="2.3" fill="#111"/><circle cx="56" cy="54" r="2.3" fill="#111"/>`;
+    return `<svg class="npc" viewBox="0 0 100 130" aria-hidden="true"><path d="M26 130Q26 80 50 76Q74 80 74 130Z" fill="${shirt}"/><path d="M42 77L50 92L58 77Z" fill="${band}"/><circle cx="50" cy="56" r="17" fill="${skin}"/>${eyes}<path d="M40 63Q50 57 60 63Q55 66.5 50 63.5Q45 66.5 40 63Z" fill="#2a1a10"/><path d="M45 67.5Q50 71.5 55 67.5" stroke="#2a1a10" stroke-width="1.8" fill="none" stroke-linecap="round"/><ellipse cx="50" cy="42" rx="46" ry="9.5" fill="${hat}"/><path d="M33 42Q34 15 50 13Q66 15 67 42Z" fill="${hat}"/><path d="M33.6 35Q50 30 66.4 35L66.8 39.5Q50 34.5 33.2 39.5Z" fill="${band}"/><ellipse cx="50" cy="42" rx="46" ry="9.5" fill="none" stroke="rgba(0,0,0,.28)" stroke-width="1.6"/>${p}</svg>`;
+  };
+  const pfp = (n) => `img/web/pfp/pfp_${String(n).padStart(2, '0')}.webp`;
+  // c = [kind, arg, bubble, bubbleSide]
+  const ch = (html, d, bubble, cls = '', extra = '') => `<div class="ch ${cls}" style="--d:${d}ms"><span class="ch__in">${html}</span>${bubble ? `<span class="bubble ${bubble[1] || ''}">${bubble[0]}</span>` : ''}${extra}</div>`;
+  const avatar = (n, d, bubble) => ch(`<img src="${pfp(n)}" alt="" width="128" height="128" decoding="async">`, d, bubble, 'ch--pfp');
+  const sparks = '<span class="sparks">' + [-60, -30, 0, 30, 60].map(a => `<i style="--a:${a}deg"></i>`).join('') + '</span>';
+  const rnd = (a, b) => a + Math.random() * (b - a);
+  const burst = (emo) => '<div class="fx-burst">' + Array.from({ length: 8 }, (_, k) => { const ang = k / 8 * Math.PI * 2; return `<i style="--k:${k};--bx:${Math.cos(ang) * 70}px;--by:${Math.sin(ang) * 55 - 20}px">${emo[k % emo.length]}</i>`; }).join('') + '</div>';
+  const POPS = {
+    hold: { line: 'Hands on the wheel!', ms: 7000, html: () =>
+      `<div class="fx-coins"><div class="fx-coins__stack">${Array.from({ length: 10 }, (_, k) => `<i class="coin" style="--k:${k}"></i>`).join('')}</div><div class="fx-coins__num"><span data-tick="12">0</span><small>months held</small></div></div>
+       <div class="pop__row">${[0, 1, 2, 3].map(i => ch(npc(i, 'wheel'), i * 110, i === 1 ? ['Hands on the wheel!', 'bubble--hi'] : i === 3 ? ["I'm not selling, I'm parking.", 'bubble--l'] : null)).join('')}</div>` },
+    judge: { line: 'Order in the court!', ms: 7000, shake: 1050, html: () =>
+      `<svg class="fx-gavel" viewBox="0 0 100 80" aria-hidden="true"><rect x="10" y="8" width="44" height="22" rx="5" fill="#8a5a2b" stroke="#3b2410" stroke-width="2" transform="rotate(-30 32 19)"/><path d="M38 28 L86 70" stroke="#5b3a1a" stroke-width="7" stroke-linecap="round"/><rect x="58" y="70" width="40" height="8" rx="3" fill="#3b2410"/></svg><span class="fx-bam">ORDER!</span>
+       <div class="pop__row">${[['10', 'Graphics: chef\'s kiss.'], ['9'], ['7', 'Story? We\'ll see.'], ['??']].map(([c, b], i) => ch(npc(i + 4, 'card', { card: c }), i * 120, b ? [b, i === 2 ? 'bubble--hi' : ''] : null)).join('')}</div>` },
+    endings: { line: 'Two endings. Tap one!', mini: true, ms: 5000, html: () =>
+      `<div class="pop__row">${ch(npc(2, 'cash'), 0, ['👍 It slaps?', 'bubble--r'])}${ch(npc(5, 'hammer'), 140, ['👎 It flops?', 'bubble--l'], '', sparks)}</div>` },
+    slaps: { line: 'It slaps! Make it rain.', ms: 7500, html: () => {
+      const bills = Array.from({ length: 22 }, () => `<i class="bill" style="--x:${rnd(0, 92)}%;--y:${rnd(0, 300)}px;--r:${rnd(-40, 40)}deg;--t:${rnd(1.6, 2.8)}s;--dl:${rnd(0, 1.4)}s">$</i>`).join('');
+      const conf = Array.from({ length: 26 }, (_, k) => `<i class="conf" style="--x:${rnd(0, 98)}%;--y:${rnd(0, 320)}px;--r:${rnd(0, 360)}deg;--t:${rnd(1.4, 2.4)}s;--dl:${rnd(0, 1.2)}s;--c:${pick(['#ff2e93', '#ffd166', '#18d6c8', '#ff8a1f', '#a66bff'], k)}"></i>`).join('');
+      return `<div class="fx-rain">${bills}${conf}</div><div class="pop__row">${ch(npc(1, 'cash', { mask: true }), 0, ['We eatin\'!', 'bubble--r'])}${avatar(3, 150, ['Told you to hold.', 'bubble--hi'])}${ch(npc(6, 'cash'), 260)}${ch(npc(8, 'cash', { mask: true }), 360, ['Pro rata, baby!', 'bubble--l'])}</div>`;
+    } },
+    flops: { line: 'It flops? Hold my hammer.', ms: 7500, html: () =>
+      `<div class="fx-blue"><svg viewBox="0 0 200 70" preserveAspectRatio="xMidYMid meet"><path d="M10 52 Q12 42 24 40 L60 38 L76 22 Q80 19 92 19 L126 19 Q136 19 144 30 L152 38 L182 40 Q192 42 192 52 L192 56 L10 56Z"/><path d="M40 56a10 10 0 1 0 0.1 0M160 56a10 10 0 1 0 0.1 0"/><path d="M82 24 L124 24 L136 36 L74 36Z"/></svg><span>GTA VI (but better) · draft v0.1</span></div>
+       <div class="pop__row">${ch(npc(3, 'hammer'), 0, ['Hold my hammer.', 'bubble--r'], '', sparks)}${ch(npc(7, 'hammer', { mask: false }), 140, null, '', sparks)}${ch(npc(9, 'hammer'), 280, ['We build our own.', 'bubble--l bubble--hi'], '', sparks)}</div>` },
+    lock: { line: 'Locked till VI.', mini: true, html: () => `${burst(['🔒', '✨'])}<div class="pop__row">${ch(npc(1, 'coin', { mask: true }), 0, ['Fees stay locked till VI. 🔒', 'bubble--r'])}${avatar(6, 150)}</div>` },
+    math: { line: 'Bags times time.', mini: true, html: () => `<div class="pop__row">${ch(npc(4, 'card', { card: '×' }), 0, ['Bags × time. Simple math.', 'bubble--r'])}${ch(npc(10, 'card', { card: '%' }), 140)}</div>` },
+    vault: { line: 'Still in the vault.', mini: true, html: () => `${burst(['💰', '✨', '🪙'])}<div class="pop__row">${ch(npc(2, 'cash', { mask: true }), 0, ['Still in the vault.', 'bubble--r'])}${ch(npc(11, 'wave'), 130)}</div>` },
+    curve: { line: 'Pre-graduation fees.', mini: true, html: () => `<div class="pop__row">${ch(npc(5, 'card', { card: '📈' }), 0, ['Pre-grad fees live here.'])}</div>` },
+    swap: { line: 'Swap swap.', mini: true, html: () => `<div class="pop__row">${ch(npc(6, 'coin'), 0, ['Wrapped and waiting.', 'bubble--r'])}${ch(npc(7, 'coin'), 120)}</div>` },
+    wallet: { line: 'Not a fee figure, chief.', mini: true, html: () => `<div class="pop__row">${avatar(10, 0, ['Not a fee figure, chief.'])}</div>` },
+    claims: { line: 'Needs an indexer, boss.', mini: true, html: () => `<div class="pop__row">${ch(npc(4, 'card', { card: '???', mask: true }), 0, ['Needs an indexer, boss.'])}</div>` },
+    live: { line: "We're live!", mini: true, html: () => `${burst(['🎉', '⭐'])}<div class="pop__row">${ch(npc(0, 'wave'), 0, ["We're live!", 'bubble--r'])}${avatar(2, 140)}</div>` },
+    crew: { line: 'Bring the whole crew.', mini: true, html: () => `<div class="pop__row">${[3, 5, 8].map((i, k) => ch(npc(i, 'wave'), k * 110, k === 1 ? ['Bring the whole crew!', 'bubble--hi'] : null)).join('')}</div>` },
+    film: { line: 'Lights, camera, sombrero!', mini: true, html: () => `<div class="pop__row">${ch(npc(9, 'card', { card: 'ACTION' }), 0, ['Lights, camera, sombrero!'])}</div>` },
+    fumble: { line: 'Only if they fumble.', mini: true, html: () => `<div class="pop__row">${ch(npc(12, 'hammer'), 0, ['Only if they fumble.', 'bubble--r'], '', sparks)}${avatar(7, 140)}</div>` },
+    ticket: { line: '2026 spots. Do not be late.', mini: true, html: () => `${burst(['🎟️', '✨'])}<div class="pop__row">${ch(npc(3, 'card', { card: '2026' }), 0, ['Save me a spot!', 'bubble--r'])}${avatar(12, 140)}</div>` },
+  };
+  const popLive = $('#pop-live');
+  let active = null;
+  const dismiss = () => {
+    if (!active) return; const a = active; active = null;
+    clearTimeout(a.timer); a.trigger.classList.remove('is-popped'); a.el.classList.add('out');
+    setTimeout(() => a.el.remove(), reduce ? 0 : 260);
+  };
+  const openPop = (trigger) => {
+    const key = trigger.dataset.pop, cfg = POPS[key]; if (!cfg) return;
+    dismiss();
+    const anchor = trigger.dataset.popAnchor ? trigger.closest(trigger.dataset.popAnchor) : trigger;
+    const r = anchor.getBoundingClientRect(), el = document.createElement('div');
+    el.className = 'pop' + (cfg.mini ? ' pop--mini' : '') + ` pop--${key}`;
+    el.style.cssText = `left:${r.left + scrollX}px;top:${r.top + scrollY}px;width:${r.width}px;height:${Math.max(r.height, cfg.mini ? 150 : 260)}px`;
+    el.innerHTML = cfg.html() + '<button class="pop__close" type="button" aria-label="Close animation">✕</button>';
+    document.body.append(el);
+    trigger.classList.add('is-popped');
+    popLive.textContent = cfg.line;
+    active = { el, trigger, w: innerWidth, timer: setTimeout(dismiss, cfg.ms || 5000) };
+    $('.pop__close', el).addEventListener('click', e => { e.stopPropagation(); dismiss(); trigger.focus({ preventScroll: true }); });
+    // tickers (coin counter)
+    $$('[data-tick]', el).forEach(t => {
+      const end = +t.dataset.tick; if (reduce) { t.textContent = end; return; }
+      let v = 0; const iv = setInterval(() => { v++; t.textContent = v; if (v >= end || !document.contains(t)) clearInterval(iv); }, 210);
+    });
+    if (cfg.shake && !reduce) setTimeout(() => { if (active?.el !== el) return; const m = $('#main'); m.classList.remove('shake'); void m.offsetWidth; m.classList.add('shake'); setTimeout(() => m.classList.remove('shake'), 500); }, cfg.shake);
+  };
+  $$('[data-pop]').forEach(t => {
+    const hint = document.createElement('span'); hint.className = 'tap-hint'; hint.setAttribute('aria-hidden', 'true');
+    hint.textContent = t.classList.contains('ending') ? 'tap me ✦' : 'tap ✦'; t.append(hint);
+  });
+  document.addEventListener('click', e => {
+    const t = e.target.closest('[data-pop]');
+    if (t && !e.target.closest('input,select,textarea,label,a,button,output')) {
+      if (active && active.trigger === t) dismiss(); else openPop(t);
+      return;
+    }
+    if (active && !e.target.closest('.pop')) dismiss();
+  });
+  document.addEventListener('keydown', e => {
+    if (e.key === 'Escape' && active) { const t = active.trigger; dismiss(); t.focus({ preventScroll: true }); return; }
+    const t = e.target;
+    if ((e.key === 'Enter' || e.key === ' ') && t.matches?.('[data-pop]')) { e.preventDefault(); if (active && active.trigger === t) dismiss(); else openPop(t); }
+  });
+  addEventListener('resize', () => { if (active && Math.abs(innerWidth - active.w) > 40) dismiss(); });
+
+  // ===== Scroll interactivity =====
+  // Wanted-level meter + lowrider road (transform only)
+  const fill = $('.hud__fill'), car = $('.hud__car'), stars = $$('.hud .star'), starFills = stars.map(s => $('b', s));
+  let lastY = scrollY, lastLit = -1, hopT, hudTick = false;
+  const hud = () => {
+    hudTick = false;
+    const max = document.documentElement.scrollHeight - innerHeight, p = max > 0 ? Math.min(1, Math.max(0, scrollY / max)) : 0;
+    fill.style.transform = `scaleX(${p.toFixed(4)})`;
+    car.style.transform = `translate3d(${(p * (innerWidth - car.offsetWidth)).toFixed(1)}px,0,0)`;
+    if (scrollY !== lastY) {
+      car.classList.toggle('rev', scrollY < lastY);
+      if (!reduce) { car.classList.add('hop'); clearTimeout(hopT); hopT = setTimeout(() => car.classList.remove('hop'), 360); }
+    }
+    lastY = scrollY;
+    const lv = p * 5; let lit = 0;
+    starFills.forEach((b, i) => { const s = Math.min(1, Math.max(0, lv - i)); b.style.transform = `scale(${s.toFixed(3)})`; if (s >= 1) lit = i + 1; });
+    if (lit > lastLit && lastLit >= 0 && lit > 0 && !reduce) { const st = stars[lit - 1]; st.classList.remove('lit'); void st.offsetWidth; st.classList.add('lit'); }
+    lastLit = lit;
+  };
+  addEventListener('scroll', () => { if (!hudTick) { hudTick = true; requestAnimationFrame(hud); } }, { passive: true });
+  addEventListener('resize', hud); hud();
+
+  // Staggered reveals per section + heading entrances
+  $$('.cast li, .nft-bar, .nft-scroll, .crew__cap, .footer__inner > *, .section .lede').forEach(el => el.classList.add('reveal'));
+  $$('section').forEach(sec => {
+    $$('.reveal', sec).forEach((el, i) => {
+      el.style.setProperty('--i', Math.min(i, 7));
+      if (!reduce) el.classList.add(el.matches('.cast li') ? 'rv-z' : el.matches('.phase, .stat') ? (i % 2 ? 'rv-r' : 'rv-l') : 'x');
+    });
+  });
+  $$('.footer .reveal').forEach((el, i) => el.style.setProperty('--i', i));
+  const rev2 = new IntersectionObserver(es => es.forEach(en => {
+    if (!en.isIntersecting) return; const el = en.target; el.classList.add('in'); rev2.unobserve(el);
+    setTimeout(() => el.classList.add('done'), 1500);
+  }), { threshold: .12 });
+  $$('.reveal:not(.in)').forEach(el => rev2.observe(el));
+  const headIO = new IntersectionObserver(es => es.forEach(en => { if (en.isIntersecting) { en.target.classList.add('in'); headIO.unobserve(en.target); } }), { threshold: .3 });
+  $$('.section .h2, .crew .h2, .section .eyebrow, .crew .eyebrow').forEach(el => headIO.observe(el));
+
+  // Animated number counters
+  const countIO = new IntersectionObserver(es => es.forEach(en => {
+    if (!en.isIntersecting) return; const el = en.target; countIO.unobserve(el);
+    const end = +el.dataset.count, pad = +el.dataset.pad || 0, fmt = (v) => pad ? String(v).padStart(pad, '0') : v.toLocaleString('en-US');
+    if (reduce) { el.textContent = fmt(end); return; }
+    const t0 = performance.now(), dur = end > 100 ? 1400 : 900;
+    const tick = (t) => { const k = Math.min(1, (t - t0) / dur), e = 1 - Math.pow(1 - k, 3); el.textContent = fmt(Math.round(end * e)); if (k < 1) requestAnimationFrame(tick); };
+    requestAnimationFrame(tick);
+  }), { threshold: .6 });
+  const nftTotal = $('#nft-total'); if (nftTotal) nftTotal.dataset.count = NFT_TILES;
+  $$('[data-count]').forEach(el => countIO.observe(el));
+
+  // Floating sombreros / cash / coins with parallax (desktop only)
+  if (parallaxOK) {
+    const SOMB = '<svg viewBox="0 0 100 50"><ellipse cx="50" cy="38" rx="48" ry="10" fill="#ffd166"/><path d="M30 38Q32 6 50 4Q68 6 70 38Z" fill="#ffb81f"/><path d="M31 30Q50 24 69 30L69.6 35Q50 29 30.4 35Z" fill="#ff2e93"/></svg>';
+    const BILL = '<svg viewBox="0 0 60 30"><rect x="1" y="1" width="58" height="28" rx="3" fill="#4caf6e" stroke="#1d6b3a" stroke-width="2"/><circle cx="30" cy="15" r="8" fill="none" stroke="#1d6b3a" stroke-width="2"/><text x="30" y="20" text-anchor="middle" font-size="13" font-weight="700" fill="#1d6b3a">$</text></svg>';
+    const COIN = '<svg viewBox="0 0 40 40"><circle cx="20" cy="20" r="18" fill="#ffd166" stroke="#a16207" stroke-width="3"/><text x="20" y="26" text-anchor="middle" font-size="17" font-weight="700" fill="#7c4a03">$</text></svg>';
+    const wrap = document.createElement('div'); wrap.className = 'floaters'; wrap.setAttribute('aria-hidden', 'true');
+    const items = Array.from({ length: 12 }, (_, k) => {
+      const f = document.createElement('div'), side = k % 2 ? rnd(88, 97) : rnd(0.5, 8);
+      f.className = 'floater'; f.innerHTML = [SOMB, BILL, COIN][k % 3];
+      f.style.cssText = `--x:${side}%;--s:${[54, 40, 28][k % 3] * rnd(.8, 1.25)}px;--t:${rnd(2.5, 5)}s`;
+      wrap.append(f); return { f, base: rnd(0, 1), depth: rnd(.15, .55) };
+    });
+    document.body.append(wrap);
+    let ft2 = false;
+    const floatFrame = () => {
+      ft2 = false; const span = innerHeight + 160;
+      items.forEach(it => { let y = (it.base * span - scrollY * it.depth) % span; if (y < 0) y += span; it.f.style.transform = `translate3d(0,${(y - 80).toFixed(1)}px,0)`; });
+    };
+    addEventListener('scroll', () => { if (!ft2) { ft2 = true; requestAnimationFrame(floatFrame); } }, { passive: true });
+    addEventListener('resize', floatFrame); floatFrame();
+  }
+
   // ===== Box click effects (ripple + per-box flourish) =====
   if (!reduce) document.addEventListener('pointerdown', e => {
     const box = e.target.closest('.bx'); if (!box || e.target.closest('input,textarea,select,label,a,button:not(.bx)')) return;
